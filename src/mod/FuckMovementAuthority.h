@@ -2,14 +2,14 @@
 
 #include "ll/api/mod/NativeMod.h"
 
-namespace my_mod {
+namespace fuck_movement_authority {
 
-class MyMod {
+class FuckMovementAuthority {
 
 public:
-    static MyMod& getInstance();
+    static FuckMovementAuthority& getInstance();
 
-    MyMod() : mSelf(*ll::mod::NativeMod::current()) {}
+    FuckMovementAuthority() : mSelf(*ll::mod::NativeMod::current()) {}
 
     [[nodiscard]] ll::mod::NativeMod& getSelf() const { return mSelf; }
 
@@ -30,4 +30,4 @@ private:
     ll::mod::NativeMod& mSelf;
 };
 
-} // namespace my_mod
+} // namespace fuck_movement_authority
