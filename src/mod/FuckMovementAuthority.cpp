@@ -14,6 +14,7 @@ FuckMovementAuthority& FuckMovementAuthority ::getInstance() {
     static FuckMovementAuthority instance;
     return instance;
 }
+int allow = 0;
 
 LL_TYPE_INSTANCE_HOOK(
     FuckMovementAuthorityHook,
@@ -27,6 +28,7 @@ LL_TYPE_INSTANCE_HOOK(
     uchar const                    currentCounter,
     bool                           isStrictMovement
 ) {
+    if (allow--) return origin(entity, packet, frame, currentCounter, isStrictMovement);
     if (Player::tryGetFromEntity(entity, false)->mLastHurtByMobTime > 50)
         return origin(entity, packet, frame, currentCounter, isStrictMovement);
     MovementCorrection result;
@@ -35,6 +37,23 @@ LL_TYPE_INSTANCE_HOOK(
     result.mNewDivergenceCounter = 0;
     return result;
 }
+
+LL_TYPE_INSTANCE_HOOK(
+    Test2,
+    ll::memory::HookPriority::Normal,
+    Player,
+    &Player::$teleportTo,
+    void,
+    ::Vec3 const& pos,
+    bool          shouldStopRiding,
+    int           cause,
+    int           sourceEntityType,
+    bool          keepVelocity
+) {
+    origin(pos, shouldStopRiding, cause, sourceEntityType, keepVelocity);
+    allow = 10;
+}
+
 
 bool FuckMovementAuthority ::load() {
     getSelf().getLogger().debug("Loading...");
