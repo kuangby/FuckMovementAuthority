@@ -28,8 +28,11 @@ LL_TYPE_INSTANCE_HOOK(
     uchar const                    currentCounter,
     bool                           isStrictMovement
 ) {
-    if (allow--) return origin(entity, packet, frame, currentCounter, isStrictMovement);
-    if (Player::tryGetFromEntity(entity, false)->mLastHurtByMobTime > 50)
+    if (allow) {
+        allow--;
+        return origin(entity, packet, frame, currentCounter, isStrictMovement);
+    }
+    if (Player::tryGetFromEntity(entity, true)->mLastHurtByMobTime > 50)
         return origin(entity, packet, frame, currentCounter, isStrictMovement);
     MovementCorrection result;
     result.mMethod               = CorrectionMethod::AcceptClient;
@@ -39,7 +42,7 @@ LL_TYPE_INSTANCE_HOOK(
 }
 
 LL_TYPE_INSTANCE_HOOK(
-    Test2,
+    FuckMovementAuthorityHook2,
     ll::memory::HookPriority::Normal,
     Player,
     &Player::$teleportTo,
@@ -64,6 +67,7 @@ bool FuckMovementAuthority ::load() {
 bool FuckMovementAuthority ::enable() {
     getSelf().getLogger().debug("Enabling...");
     FuckMovementAuthorityHook::hook();
+    FuckMovementAuthorityHook2::hook();
     // Code for enabling the mod goes here.
     return true;
 }

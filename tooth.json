@@ -2,10 +2,10 @@
     "format_version": 3,
     "format_uuid": "289f771f-2c9a-4d73-9f3f-8492495a924d",
     "tooth": "example.com/my-user/my-mod",
-    "version": "0.0.0",
+    "version": "0.1.0",
     "info": {
-        "name": "My Mod",
-        "description": "Description of my mod",
+        "name": "FuckMovementAuthority",
+        "description": "移除移动检测",
         "tags": [
             "platform:levilamina",
             "type:mod"
