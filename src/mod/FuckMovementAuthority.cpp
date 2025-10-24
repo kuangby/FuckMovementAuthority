@@ -32,7 +32,8 @@ LL_TYPE_INSTANCE_HOOK(
         allow--;
         return origin(entity, packet, frame, currentCounter, isStrictMovement);
     }
-    if (Player::tryGetFromEntity(entity, true)->mLastHurtByMobTime > 50)
+    auto player = Player::tryGetFromEntity(entity, true);
+    if (player && player->mLastHurtByMobTime > 50)
         return origin(entity, packet, frame, currentCounter, isStrictMovement);
     MovementCorrection result;
     result.mMethod               = CorrectionMethod::AcceptClient;

@@ -12,7 +12,7 @@ add_repositories("levimc-repo https://github.com/LiteLDev/xmake-repo.git")
 -- end
 
 add_requires(
-    "levilamina 1.4.3", {configs = {target_type = "server"}},    
+    "levilamina 1.6.1", {configs = {target_type = "server"}},    
     "levibuildscript"
 )
 
