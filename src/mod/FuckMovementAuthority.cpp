@@ -5,18 +5,22 @@
 #include "mc/entity/components/PackedItemUseLegacyInventoryTransaction.h"
 #include "mc/entity/components/PlayerBlockActionData.h"
 #include "mc/entity/components/PlayerBlockActions.h"
+#include "mc/entity/components/ServerPlayerMovementComponent.h"
 #include "mc/entity/components/player_tick_policy/ThrottledTickPolicy.h"
 #include "mc/entity/systems/ServerPlayerInventoryTransactionSystem.h"
 #include "mc/network/ServerNetworkHandler.h"
 #include "mc/network/ServerPlayerBlockUseHandler.h"
+#include "mc/network/packet/InventoryPacketHandler.h"
 #include "mc/network/packet/InventoryTransactionPacket.h"
 #include "mc/network/packet/InventoryTransactionPacketPayload.h"
 #include "mc/network/packet/LegacySetSlot.h"
 #include "mc/network/packet/PlayerAuthInputPacket.h"
 #include "mc/server/ServerPlayer.h"
+#include "mc/world/Minecraft.h"
 #include "mc/world/inventory/network/ItemStackRequestData.h"
 #include "mc/world/inventory/transaction/ItemUseInventoryTransaction.h"
 #include "mc/world/level/Level.h"
+
 
 #ifdef LL_PLAT_C
 #include "ll/api/service/Bedrock.h"
@@ -45,84 +49,92 @@ LL_TYPE_INSTANCE_HOOK(
     return unprocessedTicksSize == 0 ? TickAction::StopProcessing : TickAction::ProcessTick;
 }
 
-// LL_TYPE_INSTANCE_HOOK(
-//     StripOneShotActionsHook,
-//     ll::memory::HookPriority::Normal,
-//     ServerNetworkHandler,
-//     &ServerNetworkHandler::$handle,
-//     void,
-//     ::NetworkIdentifier const&     source,
-//     ::PlayerAuthInputPacket const& packet
-// ) {
-// #ifdef LL_PLAT_C
-//     if (auto serverInstance = ll::service::getServerInstance();
-//         !serverInstance || std::this_thread::get_id() != serverInstance->mServerInstanceThread->get_id())
-//         return origin(source, packet);
-// #endif
-//     if (auto player = thisFor<NetEventCallback>()->_getServerPlayer(source, packet.mSenderSubId)) {
-//         auto& pkt = const_cast<PlayerAuthInputPacket&>(packet);
+LL_TYPE_INSTANCE_HOOK(
+    StripOneShotActionsHook,
+    ll::memory::HookPriority::Normal,
+    ServerNetworkHandler,
+    &ServerNetworkHandler::$handle,
+    void,
+    ::NetworkIdentifier const&     source,
+    ::PlayerAuthInputPacket const& packet
+) {
+#ifdef LL_PLAT_C
+    if (auto serverInstance = ll::service::getServerInstance();
+        !serverInstance || std::this_thread::get_id() != serverInstance->mServerInstanceThread->get_id())
+        return origin(source, packet);
+#endif
+    auto player = thisFor<NetEventCallback>()->_getServerPlayer(source, packet.mSenderSubId);
+    if (!player) return origin(source, packet);
 
-//         // ---- 1. 剥离(必须在 origin 之前,否则出队时会二次执行)----
+    auto& pkt = const_cast<PlayerAuthInputPacket&>(packet);
 
-//         // 1a. 方块动作(Start/Continue/Stop DestroyBlock 等)
-//         std::vector<PlayerBlockActionData> blockActions;
-//         if (!pkt.mPlayerBlockActions->mActions->empty()) {
-//             blockActions = std::move(*pkt.mPlayerBlockActions->mActions);
-//         }
-//         // 1b. 物品堆请求 —— 成员本身就是 unique_ptr,直接 move
-//         auto itemStackRequest = std::move(pkt.mItemStackRequest);
-//         // 1c. 放置/使用方块的 legacy 事务 —— 同上
-//         auto itemUseTransaction = std::move(pkt.mItemUseTransaction);
+    // ---- 1. 剥离(必须在 origin 之前,否则出队时会二次执行)----
+    std::vector<PlayerBlockActionData> blockActions;
+    if (!pkt.mPlayerBlockActions->mActions->empty()) {
+        blockActions = std::move(*pkt.mPlayerBlockActions->mActions);
+    }
+    auto itemStackRequest   = std::move(pkt.mItemStackRequest);
+    auto itemUseTransaction = std::move(pkt.mItemUseTransaction);
 
-//         if (blockActions.empty() && !itemStackRequest && !itemUseTransaction) {
-//             return origin(source, packet); // 纯移动包,快进
-//         }
+    const bool hasOneShot = !blockActions.empty() || itemStackRequest || itemUseTransaction;
+    if (hasOneShot) {
+        pkt.mInputData->reset((size_t)::PlayerAuthInputPacket::InputData::PerformBlockActions);
+        pkt.mInputData->reset((size_t)::PlayerAuthInputPacket::InputData::PerformItemStackRequest);
+    }
 
-//         pkt.mInputData->reset((size_t)::PlayerAuthInputPacket::InputData::PerformBlockActions);
-//         pkt.mInputData->reset((size_t)::PlayerAuthInputPacket::InputData::PerformItemStackRequest);
+    // ---- 2. 移动数据照常入队 ----
+    origin(source, packet);
 
-//         // ---- 2. 移动数据照常入队(队列里只剩移动,服务端权威移动/rewind 不受影响)----
-//         origin(source, packet);
+    // ---- 3. 移动加速:engage 接受距离 + 折叠积压(对纯移动包也要做,不再有 early-return)----
+    if (auto comp = player->getEntityContext().tryGetComponent<ServerPlayerMovementComponent>()) {
+        if (auto vehicle = player->getVehicle(); vehicle && vehicle->isPassenger(*player))
+            comp->mAcceptClientPosIfWithinDistanceSq->reset();
+        else comp->mAcceptClientPosIfWithinDistanceSq->emplace(FLT_MAX);
 
-//         // ---- 3. 立即执行,与队列出队路径同一批入口 ----
+        auto& q = *comp->mQueuedUpdates;
+        while (q.size() > 1) {
+            auto& front = q.front();
+            if (!front.mTransactions->empty() || front.mInteraction->has_value()) break;
+            q.pop_front();
+        }
 
-//         // 3a. 挖掘:与 ProcessPlayerActionPacketSystemImpl::doProcessPlayerActionPacket
-//         //     出队时调用的是同一个函数; textFilter 同样取自 ServerNetworkHandler 成员
-//         if (!blockActions.empty() || itemStackRequest) {
-//             PlayerBlockActions actions{};
-//             *actions.mActions = std::move(blockActions);
-//             ServerPlayerBlockUseHandler::onBeforeMovementSimulation(
-//                 *player,
-//                 actions,
-//                 std::move(itemStackRequest),
-//                 *mTextFilteringProcessor
-//             );
-//         }
+        // freeze 补偿:把 credits 抬到 >= 队列长,让 catch-up adder 放行
+        if (auto mc = ll::service::getMinecraft(); mc && mc->getSimPaused()) {
+            auto credits = static_cast<uint64>(q.size());
+            if (comp->mPlayerTickCredits < credits) comp->mPlayerTickCredits = credits;
+        }
+    }
 
-//         // 3b. 放置:出队路径是把包内 PackedItemUseLegacyInventoryTransaction 组建成
-//         //     InventoryTransactionPacket 再调 transactInventoryPacket,这里照搬
-//         if (itemUseTransaction) {
-//             ::InventoryTransactionPacket txPacket{
-//                 ::InventoryTransactionPacketPayload{
-//                                                     std::make_unique<::ItemUseInventoryTransaction>(*itemUseTransaction->mTransaction),
-//                                                     false // mIsClientSide
-//                 }
-//             };
-//             // legacy 字段是 TypedStorageImpl 包装,需要 *;mTransaction/mIsClientSide 直通,不要 *
-//             *txPacket.mLegacyRequestId    = *itemUseTransaction->mID;
-//             *txPacket.mLegacySetItemSlots = *itemUseTransaction->mSlots;
-//             ::ServerPlayerInventoryTransactionSystem::transactInventoryPacket(
-//                 txPacket,
-//                 *player,
-//                 player->getLevel().getBlockPalette()
-//             );
-//         }
-//     }
-// }
+    // ---- 4. 立即执行剥离出的一次性内容(原 3a/3b,不变)----
+    if (!blockActions.empty() || itemStackRequest) {
+        PlayerBlockActions actions{};
+        *actions.mActions = std::move(blockActions);
+        ServerPlayerBlockUseHandler::onBeforeMovementSimulation(
+            *player,
+            actions,
+            std::move(itemStackRequest),
+            *mTextFilteringProcessor
+        );
+    }
+    if (itemUseTransaction) {
+        ::InventoryTransactionPacket txPacket{
+            ::InventoryTransactionPacketPayload{
+                                                std::make_unique<::ItemUseInventoryTransaction>(*itemUseTransaction->mTransaction),
+                                                false
+            }
+        };
+        *txPacket.mLegacyRequestId    = *itemUseTransaction->mID;
+        *txPacket.mLegacySetItemSlots = *itemUseTransaction->mSlots;
+        ::ServerPlayerInventoryTransactionSystem::transactInventoryPacket(
+            txPacket,
+            *player,
+            player->getLevel().getBlockPalette()
+        );
+    }
+}
 
 bool FuckMovementAuthority ::load() {
     getSelf().getLogger().debug("Loading...");
-    // StripOneShotActionsHook::hook();
     // Code for loading the mod goes here.
     return true;
 }
@@ -130,6 +142,7 @@ bool FuckMovementAuthority ::load() {
 bool FuckMovementAuthority ::enable() {
     getSelf().getLogger().debug("Enabling...");
     FuckMovementAuthorityHook::hook();
+    StripOneShotActionsHook::hook();
     // Code for enabling the mod goes here.
     return true;
 }
