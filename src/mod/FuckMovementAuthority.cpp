@@ -35,7 +35,6 @@ FuckMovementAuthority& FuckMovementAuthority ::getInstance() {
     static FuckMovementAuthority instance;
     return instance;
 }
-int allow = 0;
 
 LL_TYPE_INSTANCE_HOOK(
     FuckMovementAuthorityHook,
@@ -78,8 +77,11 @@ LL_TYPE_INSTANCE_HOOK(
 
     const bool hasOneShot = !blockActions.empty() || itemStackRequest || itemUseTransaction;
     if (hasOneShot) {
-        pkt.mInputData->reset((size_t)::PlayerAuthInputPacket::InputData::PerformBlockActions);
-        pkt.mInputData->reset((size_t)::PlayerAuthInputPacket::InputData::PerformItemStackRequest);
+        pkt.mInputData->mContainer.set((size_t)::PlayerAuthInputPacketPayload::InputData::PerformBlockActions, false);
+        pkt.mInputData->mContainer.set(
+            (size_t)::PlayerAuthInputPacketPayload::InputData::PerformItemStackRequest,
+            false
+        );
     }
 
     // ---- 2. 移动数据照常入队 ----
