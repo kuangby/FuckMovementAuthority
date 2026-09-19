@@ -57,7 +57,6 @@ LL_TYPE_INSTANCE_HOOK(
     ::NetworkIdentifier const&     source,
     ::PlayerAuthInputPacket const& packet
 ) {
-    FuckMovementAuthority::getInstance().getSelf().getLogger().info("FuckMovementAuthority called");
 #ifdef LL_PLAT_C
     if (auto serverInstance = ll::service::getServerInstance();
         !serverInstance || std::this_thread::get_id() != serverInstance->mServerInstanceThread->get_id())
