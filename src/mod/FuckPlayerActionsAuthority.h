@@ -2,14 +2,14 @@
 
 #include "ll/api/mod/NativeMod.h"
 
-namespace fuck_movement_authority {
+namespace fuck_player_actions_authority {
 
-class FuckMovementAuthority {
+class FuckPlayerActionsAuthority {
 
 public:
-    static FuckMovementAuthority& getInstance();
+    static FuckPlayerActionsAuthority& getInstance();
 
-    FuckMovementAuthority() : mSelf(*ll::mod::NativeMod::current()) {}
+    FuckPlayerActionsAuthority() : mSelf(*ll::mod::NativeMod::current()) {}
 
     [[nodiscard]] ll::mod::NativeMod& getSelf() const { return mSelf; }
 
@@ -30,4 +30,4 @@ private:
     ll::mod::NativeMod& mSelf;
 };
 
-} // namespace fuck_movement_authority
+} // namespace fuck_player_actions_authority

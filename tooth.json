@@ -1,10 +1,10 @@
 {
     "format_version": 3,
     "format_uuid": "289f771f-2c9a-4d73-9f3f-8492495a924d",
-    "tooth": "github.com/kuangby/FuckMovementAuthority",
-    "version": "26.51.2",
+    "tooth": "github.com/kuangby/FuckPlayerActionsAuthority",
+    "version": "26.51.3",
     "info": {
-        "name": "FuckMovementAuthority",
+        "name": "FuckPlayerActionsAuthority",
         "description": "Anti-Anti-Cheat",
         "author": "8848yyds",
         "tags": [
@@ -24,13 +24,13 @@
                 {
                     "type": "zip",
                     "urls": [
-                        "https://github.com/kuangby/FuckMovementAuthority/releases/download/v{{version}}/FuckMovementAuthority-server-windows-x64.zip"
+                        "https://github.com/kuangby/FuckPlayerActionsAuthority/releases/download/v{{version}}/FuckPlayerActionsAuthority-server-windows-x64.zip"
                     ],
                     "placements": [
                         {
                             "type": "dir",
-                            "src": "FuckMovementAuthority/",
-                            "dest": "plugins/FuckMovementAuthority/"
+                            "src": "FuckPlayerActionsAuthority/",
+                            "dest": "plugins/FuckPlayerActionsAuthority/"
                         }
                     ]
                 }
@@ -58,13 +58,13 @@
                 {
                     "type": "zip",
                     "urls": [
-                        "https://github.com/kuangby/FuckMovementAuthority/releases/download/v{{version}}/FuckMovementAuthority-client-windows-x64.zip"
+                        "https://github.com/kuangby/FuckPlayerActionsAuthority/releases/download/v{{version}}/FuckPlayerActionsAuthority-client-windows-x64.zip"
                     ],
                     "placements": [
                         {
                             "type": "dir",
-                            "src": "FuckMovementAuthority/",
-                            "dest": "mods/FuckMovementAuthority/"
+                            "src": "FuckPlayerActionsAuthority/",
+                            "dest": "mods/FuckPlayerActionsAuthority/"
                         }
                     ]
                 }

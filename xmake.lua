@@ -17,7 +17,7 @@ option("target_type")
     set_values("server", "client")
 option_end()
 
-target("FuckMovementAuthority") -- Change this to your mod name.
+target("FuckPlayerActionsAuthority") -- Change this to your mod name.
     add_rules("@levibuildscript/linkrule")
     add_rules("@levibuildscript/modpacker")
     if is_plat("windows") then

@@ -1,4 +1,4 @@
-#include "mod/FuckMovementAuthority.h"
+#include "mod/FuckPlayerActionsAuthority.h"
 #include "ll/api/memory/Hook.h"
 #include "ll/api/mod/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
@@ -30,15 +30,15 @@
 #endif
 
 
-namespace fuck_movement_authority {
+namespace fuck_player_actions_authority {
 
-FuckMovementAuthority& FuckMovementAuthority ::getInstance() {
-    static FuckMovementAuthority instance;
+FuckPlayerActionsAuthority& FuckPlayerActionsAuthority ::getInstance() {
+    static FuckPlayerActionsAuthority instance;
     return instance;
 }
 
 LL_TYPE_INSTANCE_HOOK(
-    FuckMovementAuthorityHook,
+    PlayerCreditHook,
     ll::memory::HookPriority::Normal,
     PlayerTickPolicy::ThrottledTickPolicy,
     &ThrottledTickPolicy ::$shouldTickPlayer,
@@ -148,29 +148,29 @@ LL_TYPE_INSTANCE_HOOK(
     }
 }
 
-bool FuckMovementAuthority ::load() {
+bool FuckPlayerActionsAuthority ::load() {
     getSelf().getLogger().debug("Loading...");
     // Code for loading the mod goes here.
     return true;
 }
 
-bool FuckMovementAuthority ::enable() {
+bool FuckPlayerActionsAuthority ::enable() {
     getSelf().getLogger().debug("Enabling...");
-    FuckMovementAuthorityHook::hook();
+    PlayerCreditHook::hook();
     StripOneShotActionsHook::hook();
     // Code for enabling the mod goes here.
     return true;
 }
 
-bool FuckMovementAuthority ::disable() {
+bool FuckPlayerActionsAuthority ::disable() {
     getSelf().getLogger().debug("Disabling...");
     // Code for disabling the mod goes here.
     return true;
 }
 
-} // namespace fuck_movement_authority
+} // namespace fuck_player_actions_authority
 
 LL_REGISTER_MOD(
-    fuck_movement_authority ::FuckMovementAuthority,
-    fuck_movement_authority ::FuckMovementAuthority ::getInstance()
+    fuck_player_actions_authority ::FuckPlayerActionsAuthority,
+    fuck_player_actions_authority ::FuckPlayerActionsAuthority ::getInstance()
 );
