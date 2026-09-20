@@ -2,6 +2,7 @@
 #include "ll/api/memory/Hook.h"
 #include "ll/api/mod/RegisterHelper.h"
 #include "ll/api/service/Bedrock.h"
+#include "mc/entity/components/DimensionStateComponent.h"
 #include "mc/entity/components/PackedItemUseLegacyInventoryTransaction.h"
 #include "mc/entity/components/PlayerBlockActionData.h"
 #include "mc/entity/components/PlayerBlockActions.h"
@@ -65,6 +66,19 @@ LL_TYPE_INSTANCE_HOOK(
     auto player = thisFor<NetEventCallback>()->_getServerPlayer(source, packet.mSenderSubId);
     if (!player) return origin(source, packet);
 
+    auto comp = player->mEntityContext->tryGetComponent<ServerPlayerMovementComponent>();
+    if (!comp) [[unlikely]]
+        return origin(source, packet);
+
+    // 传送/跨维度确认中（等待 HandledTeleport）：原版此时直接丢包。
+    // 镜像原版两道丢包门：跨维度转移中 / 传送确认中 → 原版直接丢包
+    auto dimState = player->mEntityContext->tryGetComponent<DimensionStateComponent>();
+    if ((dimState && dimState->mDimensionState != DimensionStateComponent::DimensionState::Ready)
+        || comp->mServerHasMovementAuthority->any()) {
+        comp->mAcceptClientPosIfWithinDistanceSq->reset();
+        return origin(source, packet);
+    }
+
     auto& pkt = const_cast<PlayerAuthInputPacket&>(packet);
 
     // ---- 1. 剥离(必须在 origin 之前,否则出队时会二次执行)----
@@ -88,24 +102,23 @@ LL_TYPE_INSTANCE_HOOK(
     origin(source, packet);
 
     // ---- 3. 移动加速:engage 接受距离 + 折叠积压(对纯移动包也要做,不再有 early-return)----
-    if (auto comp = player->getEntityContext().tryGetComponent<ServerPlayerMovementComponent>()) {
-        if (auto vehicle = player->getVehicle(); vehicle && vehicle->isPassenger(*player))
-            comp->mAcceptClientPosIfWithinDistanceSq->reset();
-        else comp->mAcceptClientPosIfWithinDistanceSq->emplace(FLT_MAX);
 
-        auto& q = *comp->mQueuedUpdates;
-        while (q.size() > 1) {
-            auto& front = q.front();
-            if (!front.mTransactions->empty() || front.mInteraction->has_value()) break;
-            q.pop_front();
-        }
-
-        // freeze 补偿:把 credits 抬到 >= 队列长,让 catch-up adder 放行
-        if (auto mc = ll::service::getMinecraft(); mc && mc->getSimPaused()) {
-            auto credits = static_cast<uint64>(q.size());
-            if (comp->mPlayerTickCredits < credits) comp->mPlayerTickCredits = credits;
-        }
+    if (auto vehicle = player->getVehicle(); vehicle && vehicle->isPassenger(*player))
+        comp->mAcceptClientPosIfWithinDistanceSq->reset();
+    else comp->mAcceptClientPosIfWithinDistanceSq->emplace(FLT_MAX);
+    auto& q = *comp->mQueuedUpdates;
+    while (q.size() > 1) {
+        auto& front = q.front();
+        if (!front.mTransactions->empty() || front.mInteraction->has_value()) break;
+        q.pop_front();
     }
+
+    // freeze 补偿:把 credits 抬到 >= 队列长,让 catch-up adder 放行
+    if (auto mc = ll::service::getMinecraft(); mc && mc->getSimPaused()) {
+        auto credits = static_cast<uint64>(q.size());
+        if (comp->mPlayerTickCredits < credits) comp->mPlayerTickCredits = credits;
+    }
+
 
     // ---- 4. 立即执行剥离出的一次性内容(原 3a/3b,不变)----
     if (!blockActions.empty() || itemStackRequest) {
