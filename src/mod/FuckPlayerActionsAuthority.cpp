@@ -105,7 +105,7 @@ LL_TYPE_INSTANCE_HOOK(
 
     if (auto vehicle = player->getVehicle(); vehicle && vehicle->isPassenger(*player))
         comp->mAcceptClientPosIfWithinDistanceSq->reset();
-    else comp->mAcceptClientPosIfWithinDistanceSq->emplace(FLT_MAX);
+    else comp->mAcceptClientPosIfWithinDistanceSq->emplace(25600);
     auto& q = *comp->mQueuedUpdates;
     while (q.size() > 1) {
         auto& front = q.front();
